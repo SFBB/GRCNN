@@ -214,19 +214,12 @@ class GRUNet(nn.Module):
 
 
 
-# CNN Network for SNM features
+# CNN Network for SNM features 最终版本
 class CNN_SNM(nn.Module):
 	def __init__(self):
-		super(CNN_SNM,self).__init__()
-		self.conv1 = nn.Conv2d(256, 64, 9, 64)
-		self.conv1 = nn.Conv2d(256, 64, 9, 64)
-		# input = torch.randn(2, 1, 256, 31)
-		conv1 = torch.nn.Conv2d(1, 64, (9,9), stride=(1, 1), padding='same')
-		sig = torch.nn.Sigmoid()
-		pool1 = torch.nn.MaxPool2d((3,3), stride=(3,3), padding=(1,0))
-		conv2 = torch.nn.Conv2d(64, 128, (4,4), stride=(1,1), padding='same')
-		output_ = sig(conv2(output))
-		pool2 = torch.nn.MaxPool2d((3,3), stride=(3,3), padding=(1,0))
+		super().__init__()
+		
+		pass
 
 	def forward(self, x):
 		pass
