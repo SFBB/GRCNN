@@ -2,7 +2,7 @@
 
 
 This is a implymentation of GRCNN model of
-```
+```bibtex
 @article{gomez2019gated,
   title={A gated recurrent convolutional neural network for robust spoofing detection},
   author={Gomez-Alanis, Alejandro and Peinado, Antonio M and Gonzalez, Jose A and Gomez, Angel M},
