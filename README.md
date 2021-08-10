@@ -1,7 +1,7 @@
 # GRCNN
 
 
-This is a implymentation of GRCNN model of
+This is a implementation of GRCNN model of
 ```bibtex
 @article{gomez2019gated,
   title={A gated recurrent convolutional neural network for robust spoofing detection},
