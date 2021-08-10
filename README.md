@@ -18,7 +18,7 @@ Currently, I have finished the GRCNNs model without noise(aka, SNM CNN model). A
 ### How to use
 #### Features
 Features are put in `MGDs` and `STFTs` folders which are in the same `dir`.   
-MGD is extracted with the help of `Octave`(a lightweight matlab which has nearly all matlab functions and can be used without GUI) and the `[covarep](https://github.com/covarep/covarep)`.   
+MGD is extracted with the help of `Octave`(a lightweight matlab which has nearly all matlab functions and can be used without GUI) and the [covarep](https://github.com/covarep/covarep).   
 STFT is extracted with the help of `librosa` of python3.   
 I have made a script called `database.py` to handle extractinng those two features mentioned above.
 
