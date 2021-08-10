@@ -22,8 +22,8 @@ MGD is extracted with the help of `Octave`(a lightweight matlab which has nearly
 STFT is extracted with the help of `librosa` of python3.   
 I have made a script called `database.py` to handle extractinng those two features mentioned above.
 
-### Train
+#### Train
 `main.py` is to handle this.
 
-### Sketches
+#### Sketches
 I have done many test in `Test.inpy`, it is messy, but if you have time to check it, you will get better understanding of some points in this model.
