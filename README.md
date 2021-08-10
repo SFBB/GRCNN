@@ -1,7 +1,7 @@
 # GRCNN
 
 
-This is a implymentation of GRCNN model of @article{gomez2019gated,
+This is a implymentation of GRCNN model of ```@article{gomez2019gated,
   title={A gated recurrent convolutional neural network for robust spoofing detection},
   author={Gomez-Alanis, Alejandro and Peinado, Antonio M and Gonzalez, Jose A and Gomez, Angel M},
   journal={IEEE/ACM Transactions on Audio, Speech, and Language Processing},
@@ -10,7 +10,7 @@ This is a implymentation of GRCNN model of @article{gomez2019gated,
   pages={1985--1999},
   year={2019},
   publisher={IEEE}
-} in pytorch.
+}``` in pytorch.
 
 ### Status
 Currently, I have finished the GRCNNs model without noise(aka, SNM CNN model). And I only finished the train part.
