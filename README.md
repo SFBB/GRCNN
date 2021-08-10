@@ -24,3 +24,6 @@ I have made a script called `database.py` to handle extractinng those two featur
 
 ### Train
 `main.py` is to handle this.
+
+### Sketches
+I have done many test in `Test.inpy`, it is messy, but if you have time to check it, you will get better understanding of some points in this model.
