@@ -11,8 +11,7 @@ This is a implymentation of GRCNN model of ```
   pages={1985--1999},
   year={2019},
   publisher={IEEE}
-}
-``` in pytorch.
+}``` in pytorch.
 
 ### Status
 Currently, I have finished the GRCNNs model without noise(aka, SNM CNN model). And I only finished the train part.
