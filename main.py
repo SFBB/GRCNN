@@ -3,7 +3,7 @@ import datetime
 
 import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = '2'
-
+# os.environ["CUDA_VISIBLE_DEVICES"]=""
 import torch
 import torch.nn.functional as F
 # from A_softmax import A_softmax
@@ -22,7 +22,7 @@ import ast
 from tqdm import tqdm
 import argparse
 import sys
-from dataloader import TorchDataset, custom_collate
+from dataloader import TorchDataset, custom_collate, custom_collate_for_dev
 from torch.utils.data import DataLoader
 from GRCNN import GRCNNs
 
@@ -39,7 +39,7 @@ parser.add_argument('--sample_rate', type=int, default=16000, help='sample_rate'
 
 parser.add_argument('--load_model_from', type=str, default=None, help='load_model_from')
 parser.add_argument('--model_ID', type=int, default=-1, help='eval ID')
-parser.add_argument('--task', type=str, default='train', help='task', choices=['train', 'test'])
+parser.add_argument('--task', type=str, default='train', help='task', choices=['train', 'dev', 'test', 'dev_and_eval'])
 
 parser.add_argument('--loss', type=str, default='CE', help='loss function', choices=['CE', 'FocalLoss'])
 
@@ -63,6 +63,16 @@ parser.add_argument('--noise', type=str, default=None, help='noise type', choice
 parser.add_argument('--access_type', type=str, default='LA', help='access_type')
 parser.add_argument('--pathToData', type=str, default='1dim', help='pathToData')
 parser.add_argument('--batch_size', type=int, default=16, help='batch_size')
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+parser.add_argument('--cuda', type=str2bool, default=True, help='cuda or not')
 
 args = parser.parse_args()
 print('args: ', args)
@@ -71,8 +81,8 @@ print('args: ', args)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print("sadasdasd")
 print(device)
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_name(0))
+# print(torch.cuda.is_available())
+# print(torch.cuda.get_device_name(0))
 
 if args.task == 'train':
     if args.load_model_from:
@@ -103,16 +113,150 @@ elif args.task == 'eval':
 # def transform_lables_for_CE(labels):
 #     result = []
 #     for label in labels:
-        
+def cal_accuracy(scores, labels, all, wrong):
+    predicts = torch.max(scores, 1).indices
+    for index, predict in enumerate(predicts):
+        if predict != labels[index]:
+            wrong += 1
+        all += 1
+    # print(wrong, all)
+    return 1-wrong/all, all, wrong
+
+def eval(net):
+    path = "/media/ssd1T/antispoof/2019/LA"
+    result_path = "cm.eval.scores.txt"
+    eval_data = TorchDataset(data_list=path+"/ASVspoof2019_LA_cm_protocols/ASVspoof2019.LA.cm.eval.trl.txt", data_dir="/media/ssd1T/anzhe/GRCNN/", task="eval", num_classes=20, repeat=None)
+    eval_loader = DataLoader(dataset=eval_data, batch_size=1, collate_fn=custom_collate_for_dev, shuffle=False)
+    with open(result_path, "w+") as file:
+        # file_ = open(result_path+".labels", "w+")
+        t = tqdm(range(eval_data.get_len()))
+        eval_loader_iter = iter(eval_loader)
+        net.eval()
+        softmax = torch.nn.Softmax(dim=1)
+
+        all = 0
+        wrong = 0
+        with torch.no_grad():
+            for step in t:
+                (batch_flacs_MGD, batch_flacs_STFT, batch_ids, batch_names, batch_types, batch_genders, batch_labels) = next(eval_loader_iter)
+                # model.to("cpu")
+                # print(args.cuda)
+                batch_flacs_MGD = torch.from_numpy(batch_flacs_MGD).float()
+                batch_flacs_STFT = torch.from_numpy(batch_flacs_STFT).float()
+                if args.cuda:
+                    batch_flacs_MGD = batch_flacs_MGD.cuda()
+                    batch_flacs_STFT = batch_flacs_STFT.cuda()
+
+                preditcted_labels = net(batch_flacs_MGD, batch_flacs_STFT, args.cuda)
+                scores = softmax(preditcted_labels)
+                # scores = preditcted_labels
+                # for index, flac in enumerate(batch_names):
+                    # file.write("{} {:.10f} {:.10f}\n".format(flac, scores[index][0], scores[index][1]))
+                file.write("{} {} - {} {} {:.10f}\n".format(batch_ids[0], batch_names[0], batch_types[0], batch_genders[0], scores[0][0]))
+
+                    # file_.write("{} {:.10f} {:.10f} {}\n".format(flac, scores[index][0], scores[index][1], batch_labels[index]))
+
+                accuracy, all, wrong = cal_accuracy(scores, batch_labels, all, wrong)
+                t.set_description('[%02d] Accuracy: %.5f' % (step + 1, accuracy))
+            print("Finished! Accuracy on eval is %.5f" % accuracy)
+                # scores = scores[:, 0]
+                # print(next(model.parameters()).is_cuda)
+                # exit(0)
+                # else:
+                    # model.to(torch.device("cpu"))
+                # output = model(batch, batch_, args.cuda)
+                # print(torch.max(output, 1))
+                # print(label)
+
+def dev(net):
+    path = "/media/ssd1T/antispoof/2019/LA"
+    result_path = "cm.dev.scores.txt"
+    dev_data = TorchDataset(data_list=path+"/ASVspoof2019_LA_cm_protocols/ASVspoof2019.LA.cm.dev.trl.txt", data_dir="/media/ssd1T/anzhe/GRCNN/", task="dev", num_classes=20, repeat=None)
+    dev_loader = DataLoader(dataset=dev_data, batch_size=1, collate_fn=custom_collate_for_dev, shuffle=False)
+    with open(result_path, "w+") as file:
+        # file_ = open(result_path+".labels", "w+")
+        t = tqdm(range(dev_data.get_len()))
+        dev_loader_iter = iter(dev_loader)
+        # net = load_model()
+        # if args.cuda:
+        #     net.cuda()
+        net.eval()
+        softmax = torch.nn.Softmax(dim=1)
+
+        all = 0
+        wrong = 0
+        with torch.no_grad():
+            for step in t:
+                (batch_flacs_MGD, batch_flacs_STFT, batch_ids, batch_names, batch_types, batch_genders, batch_labels) = next(dev_loader_iter)
+                # model.to("cpu")
+                # print(args.cuda)
+                batch_flacs_MGD = torch.from_numpy(batch_flacs_MGD).float()
+                batch_flacs_STFT = torch.from_numpy(batch_flacs_STFT).float()
+                if args.cuda:
+                    batch_flacs_MGD = batch_flacs_MGD.cuda()
+                    batch_flacs_STFT = batch_flacs_STFT.cuda()
+
+                preditcted_labels = net(batch_flacs_MGD, batch_flacs_STFT, args.cuda)
+                scores = softmax(preditcted_labels)
+                # scores = preditcted_labels
+                # for index, flac in enumerate(batch_names):
+                file.write("{} {} - {} {} {:.10f}\n".format(batch_ids[0], batch_names[0], batch_types[0], batch_genders[0], scores[0][0]))
+                    # file_.write("{} {} {:.10f} {:.10f} {}\n".format(flac, scores[index][0], scores[index][1], batch_labels[index]))
+
+                accuracy, all, wrong = cal_accuracy(scores, batch_labels, all, wrong)
+                t.set_description('[%02d] Accuracy: %.5f' % (step + 1, accuracy))
+            print("Finished! Accuracy on dev is %.5f" % accuracy)
+                # scores = scores[:, 0]
+                # print(next(model.parameters()).is_cuda)
+                # exit(0)
+                # else:
+                    # model.to(torch.device("cpu"))
+                # output = model(batch, batch_, args.cuda)
+                # print(torch.max(output, 1))
+                # print(label)
+
+def dev_and_eval():
+    net = load_model()
+    if args.cuda:
+        net.cuda()
+    net.eval()
+    dev(net)
+    eval(net)
+
+def load_model():
+    model_param_path = '{}_models_{}'.format(args.access_type, args.model_ID)
+    models = os.listdir("models/")
+    models_ = []
+    print(model_param_path)
+    for model in models:
+        if model_param_path in model:
+            models_.append(model)
+    print(models_)
+    r = input("Those models fit in your model id, which one do you want to load?")
+    model_param_path = os.path.join("models", models_[int(r)])
+    params = os.listdir(model_param_path)
+    params_ = []
+    for param in params:
+        params_.append(int(param.split("_")[1].split(".")[0]))
+    params_.sort()
+    print(params_)
+    r = input("Those versions this model has, which one do you want?")
+    param = int(r)
+    model = GRCNNs(2)
+    model.load_state_dict(torch.load(os.path.join(model_param_path, "params_%d.pkl" % param)))
+    # print(model)
+    return model
 
 def train():
     path = "/media/ssd1T/antispoof/2019/LA"
-    train_data = TorchDataset(data_list=path+"/ASVspoof2019_LA_cm_protocols/ASVspoof2019.LA.cm.train.trn.txt", data_dir="/media/ssd1T/anzhe/GRCNN/", num_classes=20, repeat=None)
+    train_data = TorchDataset(data_list=path+"/ASVspoof2019_LA_cm_protocols/ASVspoof2019.LA.cm.train.trn.txt", data_dir="/media/ssd1T/anzhe/GRCNN/", task="train", num_classes=20)
     train_loader = DataLoader(dataset=train_data, batch_size=args.batch_size, collate_fn=custom_collate, shuffle=True)
 
-    net = GRCNNs(20).cuda()
+    net = GRCNNs(2)
+    if args.cuda:
+        net = net.cuda()
 
-    optimizer = optim.Adam(net.parameters(), lr=1e-4)
+    optimizer = optim.Adam(net.parameters(), lr=3e-4)
     criterion = torch.nn.CrossEntropyLoss()
 
     start_epoch = 0
@@ -137,15 +281,25 @@ def train():
             # print(np.concatenate(batch_flacs, axis=0).shape)
             # batch_flacs = torch.from_numpy(np.concatenate(batch_flacs, axis=0)).to(device)
             # batch_labels = torch.from_numpy(np.concatenate(batch_labels, axis=0)).to(device)
-            optimizer.zero_grad()
+            batch_flacs_MGD = torch.from_numpy(batch_flacs_MGD).float()
+            batch_flacs_STFT = torch.from_numpy(batch_flacs_STFT).float()
+            if args.cuda:
+                batch_flacs_MGD = batch_flacs_MGD.cuda()
+                batch_flacs_STFT = batch_flacs_STFT.cuda()
 
-            preditcted_labels = net(batch_flacs_MGD, batch_flacs_STFT, device)
+            preditcted_labels = net(batch_flacs_MGD, batch_flacs_STFT, args.cuda)
+
+            optimizer.zero_grad()
             # print(preditcted_labels.shape)
             # print(batch_labels.shape)
 
-            loss = criterion(preditcted_labels, torch.as_tensor(batch_labels).cuda())
+            if args.cuda:
+                loss = criterion(preditcted_labels, torch.from_numpy(batch_labels).cuda())
+            else:
+                loss = criterion(preditcted_labels, torch.from_numpy(batch_labels))
             del preditcted_labels
             loss.backward()
+            torch.nn.utils.clip_grad_norm(net.parameters(), max_norm=1)
             optimizer.step()
             running_loss += loss.item()
             # t.update(step)
@@ -160,7 +314,7 @@ def train():
                 break
         
         torch.save(net.state_dict(), model_dir+'/params_%d.pkl' % (epoch + 1))
-        if running_loss / (train_data.get_len()//16) >= last_loss:
+        if running_loss / (train_data.get_len()//args.batch_size) >= last_loss:
             count += 1
         else:
             last_loss = running_loss / (train_data.get_len()//args.batch_size)
@@ -173,3 +327,20 @@ def train():
 if __name__ == "__main__":
     if args.task == "train":
         train() # 具体参数在这个train中调节
+
+    if args.task == "dev":
+        net = load_model()
+        if args.cuda:
+            net.cuda()
+        # net.eval()
+        dev(net)
+
+    if args.task == "eval":
+        net = load_model()
+        if args.cuda:
+            net.cuda()
+        # net.eval()
+        eval(net)
+    
+    if args.task == "dev_and_eval":
+        dev_and_eval()

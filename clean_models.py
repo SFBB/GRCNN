@@ -23,7 +23,7 @@ def not_in_whitelist(dir, lst):
     return False
 
 to_remove = []
-whitelist = []
+whitelist = ["72484606"]
 for model in models:
     if "_models_" in model and is_int(model.split("_")[2]) and not_in_whitelist(model, whitelist):
         to_remove.append(os.path.join("models", model))

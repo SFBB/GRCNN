@@ -130,19 +130,24 @@ class ConvGRUCell(nn.Module):
 		nn.init.constant(self.out_gate.bias, 0.)
 
 
-	def forward(self, input_, prev_state):
+	def forward(self, input_, prev_state, cuda_=True):
 
 		# get batch and spatial sizes
+		# if cuda_:
 		batch_size = input_.data.size()[0]
 		spatial_size = input_.data.size()[2:]
+		# else:
+			# batch_size = input_.shape[0]
+			# spatial_size = input_.data.size()[2:]
 #         print(batch_size, spatial_size)
 		
 		# generate empty prev_state, if None is provided
 		if prev_state is None:
 			state_size = [batch_size, self.output_size//2] + list(spatial_size)
-			if torch.cuda.is_available():
+			if torch.cuda.is_available() and cuda_:
 				prev_state = Variable(torch.zeros(state_size)).cuda()
 			else:
+				# print("sadasd")
 				prev_state = Variable(torch.zeros(state_size))
 
 		# data size is [batch, channel, height, width]
@@ -151,11 +156,11 @@ class ConvGRUCell(nn.Module):
 		# reset = F.sigmoid(self.reset_maxout(self.reset_gate(stacked_inputs)))
 		# # out_inputs = F.tanh(self.out_gate(torch.cat([input_, prev_state * reset], dim=1)))
 #         print(input_.shape, prev_state.shape)
-		z_t_n = self.sigmoid(self.update_maxout(self.dropout(self.update_gate(input_))+self.dropout(self.update_gate_(prev_state))))
-		r_t_n = self.sigmoid(self.reset_maxout(self.dropout(self.reset_gate(input_))+self.dropout(self.reset_gate_(prev_state))))
+		z_t_n = self.dropout(self.sigmoid(self.update_maxout(self.update_gate(input_)+self.update_gate_(prev_state))))
+		r_t_n = self.dropout(self.sigmoid(self.reset_maxout(self.reset_gate(input_)+self.reset_gate_(prev_state))))
 #         print("z_t_n.shape, r_t_n.shape, prev_state.shape", z_t_n.shape, r_t_n.shape, prev_state.shape)
 #         print("(r_t_n * prev_state).shape", torch.mul(r_t_n, prev_state).shape)
-		hidden_ = self.tanh(self.out_maxout(self.dropout(self.out_gate(input_))+self.dropout(self.out_gate_(r_t_n * prev_state))))
+		hidden_ = self.tanh(self.out_maxout(self.out_gate(input_)+self.out_gate_(r_t_n * prev_state)))
 #         print(z_t_n.shape, r_t_n.shape, prev_state.shape, hidden_.shape)
 		new_state = z_t_n * prev_state + (1 - z_t_n) * hidden_
 
@@ -170,33 +175,38 @@ class GRCNN(nn.Module):
 		self.fc = nn.Linear(8*32*32, 480*2)
 		self.maxout = Maxout.apply
 		# self.fc_class = nn.Linear(480, classes_num)
-		# self.dropout = nn.Dropout(p=0.6)
+		self.dropout = nn.Dropout(p=0.5)
 		# self.softmax = nn.Softmax(dim=0)
 		
 		self.window_size = 32
 		self.step = 10
 		
-	def forward(self, frames, device):
+	def forward(self, frames, cuda_):
 		# labels = None
-		frames = torch.from_numpy(frames).cuda().float()
+		# if cuda_:
+		# 	frames = torch.from_numpy(frames).cuda().float()
+		# else:
+		# 	frames = torch.from_numpy(frames).float()
 		# print(frames)
 		h_1 = None
 #         print(h_1.shape)
 		h_2 = None
 		h_3 = None
-		for t in range(int((frames.shape[2]-self.window_size)/self.step)+1):
-			frame = frames[:, :, t*self.step: t*self.step+self.window_size].reshape(1, 1, 256, -1)
+		for t in range(int((frames.shape[3]-self.window_size)/self.step)+1):
+			frame = frames[:, :, :, t*self.step: t*self.step+self.window_size]
 #             print(frame.shape, h_1.shape)
 			# print(frame)
-			y, h_1 = self.GRCU_1(frame, h_1)
+			# print(cuda_)
+			y, h_1 = self.GRCU_1(frame, h_1, cuda_)
 #             print(y.shape, h_1.shape)
-			y, h_2 = self.GRCU_2(y, h_2)
-			y, h_3 = self.GRCU_3(y, h_3)
+			y, h_2 = self.GRCU_2(y, h_2, cuda_)
+			y, h_3 = self.GRCU_3(y, h_3, cuda_)
 #             print(y)
 #         y = self.fc(y)
-		y = self.fc(y.flatten())
+		y = self.fc(y.flatten(start_dim=1))
 #         print(y.shape)
-		y = self.maxout(y.reshape(1, 480*2, 1, 1)).flatten()
+
+		y = self.dropout(self.maxout(y.reshape(-1, 480*2, 1, 1)).flatten(start_dim=1))
 #         print(y.shape)
 		# classes = self.fc_class(y)
 		# classes = self.dropout(classes)
@@ -221,24 +231,26 @@ class GRCNNs(nn.Module):
 		self.GRCNN_STFT = GRCNN(classes_num)
 
 		self.fc_class = nn.Linear(480*2, classes_num)
-		self.dropout = nn.Dropout(p=0.6)
-		self.softmax = nn.Softmax(dim=0)
+		# self.dropout = nn.Dropout(p=0.6)
+		# self.softmax = nn.Softmax(dim=0)
 
-	def forward(self, MGDs, STFTs, device):
-		labels = None
-		for i, MGD in enumerate(MGDs):
-			STFT = STFTs[i]
+	def forward(self, MGDs, STFTs, cuda_=True):
+		# labels = None
+		# for i, MGD in enumerate(MGDs):
+			# STFT = STFTs[i]
 			# print(STFT.shape, MGD.shape)
-			i_vectors_MGD = self.GRCNN_MGD(MGD, device)
-			i_vectors_STFT = self.GRCNN_STFT(STFT, device)
-			# print(torch.cuda.memory_allocated(0))
-			i_vectors = torch.stack((i_vectors_MGD, i_vectors_STFT))
-			classes = self.dropout(self.fc_class(i_vectors.flatten()))
-			if labels == None:
-				labels = self.softmax(classes).reshape(1, self.classes_num)
-			else:
-				labels = torch.cat((labels, self.softmax(classes).reshape(1, self.classes_num)))
-		return labels
+		i_vectors_MGD = self.GRCNN_MGD(MGDs, cuda_)
+		i_vectors_STFT = self.GRCNN_STFT(STFTs, cuda_)
+		# print(torch.cuda.memory_allocated(0))
+		i_vectors = torch.stack((i_vectors_MGD, i_vectors_STFT), dim=1)
+		classes = self.fc_class(i_vectors.flatten(start_dim=1))
+		# classes = self.softmax(classes)
+		
+			# if labels == None:
+				# labels = self.softmax(classes).reshape(1, self.classes_num)
+			# else:
+				# labels = torch.cat((labels, self.softmax(classes).reshape(1, self.classes_num)))
+		return classes
 
 
 

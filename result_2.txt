@@ -1,0 +1,43 @@
+args:  Namespace(access_type='LA', addmusic=False, batch_size=32, cuda=True, dim=1, length=96000, load_model_from=None, loss='CE', model_ID=-1, music_path='musdb18_accompaniment', nepoch=120, noise=None, noise_rate=1.0, norm_wav=False, num_workers=8, pathToData='1dim', sample_rate=16000, task='train', truncate=True, volume_rate=1)
+cuda
+model_ID:  58381949
+
+[1] loss: 0.20263
+
+[2] loss: 0.05098
+
+[3] loss: 0.01777
+
+[4] loss: 0.01360
+
+[5] loss: 0.01671
+
+[6] loss: 0.01778
+
+[7] loss: 0.01216
+
+[8] loss: 0.00861
+
+[9] loss: 0.01281
+
+[10] loss: 0.01281
+
+[11] loss: 0.15647
+
+[12] loss: 0.06314
+
+[13] loss: 0.00720
+
+[14] loss: 0.00478
+
+[15] loss: 0.01659
+
+[16] loss: 0.01722
+
+[17] loss: 0.01088
+
+[18] loss: 0.01023
+
+[19] loss: 0.01460
+
+[20] loss: 0.01097

@@ -12,7 +12,7 @@ import pandas as pd
 
 # 以数据类型为单位，train是一个dataset，dev是一个，test是一个
 class TorchDataset(Dataset):
-    def __init__(self, data_list, data_dir, num_classes, repeat=1):
+    def __init__(self, data_list, data_dir, task, num_classes, repeat=1):
         '''
         :param data_list: 数据文件TXT：格式：imge_name.jpg label1_id labe2_id
         :param data_dir: 图片路径：image_dir+imge_name.jpg构成图片的完整路径
@@ -25,11 +25,15 @@ class TorchDataset(Dataset):
         self.data_list = self.load_list(data_list)
         self.data_dir = data_dir
         self.len = len(self.data_list)
+        self.task = task
         self.num_classes = num_classes
         self.repeat = repeat
 
         # 默认特征是STFT，可选MGD
         self.feature = "STFT"
+
+        # padding或者剪切的固定长度为N frames
+        self.fixed_length = 256
  
         # 相关预处理的初始化
         '''class torchvision.transforms.ToTensor'''
@@ -46,15 +50,21 @@ class TorchDataset(Dataset):
     def __getitem__(self, i):
         index = i % self.len
         # print("i={},index={}".format(i, index))
-        flac_name, label = self.data_list[index]["name"],self.data_list[index]["label"]
+        flac_name, label = self.data_list[index]["name"], self.data_list[index]["label"]
         # flac_path = os.path.join(self.data_dir, flac_name)
-        flac_feature_STFT = self.load_data(flac_name, "STFT")
-        flac_feature_MGD = self.load_data(flac_name, "MGD")
-        flac_feature_STFT = self.data_preproccess(flac_feature_STFT)
-        flac_feature_MGD = self.data_preproccess(flac_feature_MGD)
+        if self.task != "compute":
+            flac_feature_STFT = self.load_data(flac_name, "STFT")
+            flac_feature_MGD = self.load_data(flac_name, "MGD")
+            flac_feature_STFT = self.data_preproccess(flac_feature_STFT)
+            flac_feature_MGD = self.data_preproccess(flac_feature_MGD)
         # label=np.array(label)
         label = self.process_label(label)
-        return flac_feature_MGD, flac_feature_STFT, label
+        if self.task == "train":
+            return flac_feature_MGD, flac_feature_STFT, label
+        elif self.task == "dev" or self.task == "eval":
+            return flac_feature_MGD, flac_feature_STFT, self.data_list[index]["id"], flac_name, self.data_list[index]["label"]["type"], self.data_list[index]["label"]["gender"], label
+        else:
+            return label, flac_name, self.data_list[index]["id"]
  
     def __len__(self):
         if self.repeat == None:
@@ -79,7 +89,7 @@ class TorchDataset(Dataset):
         :param normalization: 是否归一化
         :return:
         '''
-        with open(self.data_dir+"/"+feature+"s/"+file_name+".npy", "rb") as file:
+        with open(self.data_dir+"/"+feature+"s/"+self.task+"/"+file_name+".npy", "rb") as file:
             data = np.load(file)
         if feature == "MGD":
             data = data[:256, :]
@@ -91,11 +101,20 @@ class TorchDataset(Dataset):
     def process_label(self, label):
         # "label": {"type": row[1][3], "gender": row[1][4]}}
         # label_ = np.zeros(self.num_classes)
-        if label["gender"] == "bonafide": # geniue    - bonafide
-            label_ = 0
-        else: # spoof - check type    A03 spoof
-            label_ = int(label["type"][1:])
-        return label_
+        if self.task != "compute":
+            if label["gender"] == "bonafide": # geniue    - bonafide
+                label_ = 0
+            else: # spoof - check type    A03 spoof
+                # label_ = int(label["type"][1:])
+                label_ = 1
+            return label_
+        else:
+            if label["gender"] == "bonafide": # geniue    - bonafide
+                label_ = 0
+            else: # spoof - check type    A03 spoof
+                label_ = int(label["type"][1:])
+                # label_ = 1
+            return label_
 
     def data_preproccess(self, data):
         '''
@@ -103,7 +122,11 @@ class TorchDataset(Dataset):
         :param data:
         :return:
         '''
-        data = data.reshape(1, 256, -1) # (1, 1, 256, frames_num), (N, C, W, H)
+        if data.shape[1] > self.fixed_length:
+            data = data[:, (data.shape[1]-self.fixed_length)//2:(data.shape[1]-self.fixed_length)//2+self.fixed_length]
+        else:
+            data = np.pad(data, ((0, 0), (0, self.fixed_length-data.shape[1])), mode="wrap")
+        data = data.reshape(1, 256, self.fixed_length) # (1, 1, 256, frames_num), (N, C, W, H)
         # data = torch.from_numpy(data)
         return data
 
@@ -142,8 +165,66 @@ def custom_collate(batch):
     # print(len(batch[0][0][0]))
     # print(len(batch[0][0][0][0]))
     # print(batch)
-    return batch_flacs_MGD, batch_flacs_STFT, batch_labels
+    return np.array(batch_flacs_MGD), np.array(batch_flacs_STFT), np.array(batch_labels)
 
+
+def custom_collate_for_dev(batch):
+    # index = 0
+    batch_flacs_MGD = []
+    batch_flacs_STFT = []
+    batch_ids = []
+    batch_names = []
+    batch_types = []
+    batch_genders = []
+    batch_labels = []
+    for flac in batch:
+        batch_flacs_MGD.append(flac[0])
+        batch_flacs_STFT.append(flac[1])
+        batch_ids.append(flac[2])
+        batch_names.append(flac[3])
+        # batch_ids.append(flac[4])
+        batch_types.append(flac[4])
+        batch_genders.append(flac[5])
+        batch_labels.append(flac[6])
+        # print(flac(1))
+        # batch_labels = torch.cat((batch_labels, torch.from_numpy(flac[1])))
+        # index += 1
+    # batch_flacs: (32, 1, 256, frame_number)
+    # batch_labels: (32, num_classes)
+    # print(len(batch))
+    # print(len(batch[0]))
+    # print(len(batch[0][0]))
+    # print(len(batch[0][0][0]))
+    # print(len(batch[0][0][0][0]))
+    # print(batch)
+    return np.array(batch_flacs_MGD), np.array(batch_flacs_STFT), batch_ids, batch_names, batch_types, batch_genders, np.array(batch_labels)
+
+
+def custom_collate_for_compute(batch):
+    # index = 0
+    # batch_flacs_MGD = []
+    # batch_flacs_STFT = []
+    batch_labels = []
+    batch_names = []
+    batch_ids = []
+    for flac in batch:
+        # batch_flacs_MGD.append(flac[0])
+        # batch_flacs_STFT.append(flac[1])
+        batch_labels.append(flac[0])
+        batch_names.append(flac[1])
+        batch_ids.append(flac[2])
+        # print(flac(1))
+        # batch_labels = torch.cat((batch_labels, torch.from_numpy(flac[1])))
+        # index += 1
+    # batch_flacs: (32, 1, 256, frame_number)
+    # batch_labels: (32, num_classes)
+    # print(len(batch))
+    # print(len(batch[0]))
+    # print(len(batch[0][0]))
+    # print(len(batch[0][0][0]))
+    # print(len(batch[0][0][0][0]))
+    # print(batch)
+    return np.array(batch_labels), batch_names, batch_ids
 
 if __name__ == "__main__":
 
