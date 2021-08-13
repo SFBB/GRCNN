@@ -37,7 +37,7 @@ I have made a script called `main_database.py` to handle extractinng those two f
 I have done many test in `Test.inpy`, it is messy, but if you have time to check it, you will get better understanding of some points in this model.
 
 #### History
-2021.08.10 Complte train function.
-2021.08.13 Fixed the bug of the model, and add eval functions. More fixes on generate features scripts and others.
+2021.08.10 Complte train function.   
+2021.08.13 Fixed the bug of the model, and add eval functions. More fixes on generate features scripts and others.   
 
 Future plan: Add classifier like GMM, PLDA to replace FC+Softmax during training phase which the original paper mentioned, to make this model work in pratice.
