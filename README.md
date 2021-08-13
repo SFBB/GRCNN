@@ -24,10 +24,20 @@ Currently, I have finished the GRCNNs model without noise(aka, SNM CNN model). A
 Features are put in `MGDs` and `STFTs` folders which are in the same `dir`.   
 MGD is extracted with the help of `Octave`(a lightweight matlab which has nearly all matlab functions and can be used without GUI) and the [covarep](https://github.com/covarep/covarep).   
 STFT is extracted with the help of `librosa` of python3.   
-I have made a script called `database.py` to handle extractinng those two features mentioned above.
+I have made a script called `main_database.py` to handle extractinng those two features mentioned above.
 
 #### Train
 `main.py` is to handle this.
 
+#### Evalution
+`main.py` --task dev/eval/dev_and_eval is used to calculate the accuracy on dev and eval, and make a general scores files which are used as index for [ASVSpoof metrics, t-DCF and EER](https://www.asvspoof.org/asvspoof2021/asvspoof2021_evaluation_plan.pdf), APPENDIX.   
+`main_plus_asv.py` is used after the above step, to calculate EER and t-DCF based on the official python methods provided by ASVSpoof. (To be exact, this is only a script which can make you use official python methods more easily). 
+
 #### Sketches
 I have done many test in `Test.inpy`, it is messy, but if you have time to check it, you will get better understanding of some points in this model.
+
+#### History
+2021.08.10 Complte train function.
+2021.08.13 Fixed the bug of the model, and add eval functions. More fixes on generate features scripts and others.
+
+Future plan: Add classifier like GMM, PLDA to replace FC+Softmax during training phase which the original paper mentioned, to make this model work in pratice.
