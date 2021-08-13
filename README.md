@@ -27,7 +27,8 @@ STFT is extracted with the help of `librosa` of python3.
 I have made a script called `main_database.py` to handle extractinng those two features mentioned above.
 
 #### Train
-`main.py` is to handle this.
+`main.py` is to handle this.   
+Based on the pratical situation, you need to change the fixed_length in dataset in `dataloader.py`, to utlize your GPU memory or memory more efficiently.
 
 #### Evalution
 `main.py` --task dev/eval/dev_and_eval is used to calculate the accuracy on dev and eval, and make a general scores files which are used as index for [ASVSpoof metrics, t-DCF and EER](https://www.asvspoof.org/asvspoof2021/asvspoof2021_evaluation_plan.pdf), APPENDIX.   
@@ -38,6 +39,6 @@ I have done many test in `Test.inpy`, it is messy, but if you have time to check
 
 #### History
 2021.08.10 Complte train function.   
-2021.08.13 Fixed the bug of the model, and add eval functions. More fixes on generate features scripts and others.   
+2021.08.13 Fixed bugs of the model(traning loss no imporoved, very slow training speed, etc), and add eval functions. More fixes on generate features scripts and others. Imporvments on dataloader method.   
 
 Future plan: Add classifier like GMM, PLDA to replace FC+Softmax during training phase which the original paper mentioned, to make this model work in pratice.
